@@ -1,6 +1,6 @@
 # get colors
 
-GetColor <- function(method,score,color,score.values,n,q){
+GetColor <- function(method,score,color,score.values,n,q,cohorts){
   switch(method,
          
          "confidence" = {
@@ -37,7 +37,7 @@ GetColor <- function(method,score,color,score.values,n,q){
              color1 <- colorRampPalette(c("red2","indianred4","royalblue4","steelblue1","chartreuse3","darkgreen"))(cohort.size)
            }else{
              switch (color,
-                     "1" = {rainbow(cohort.size)},
+                     "1" = {color1 <- rainbow(cohort.size)},
                      "2" = {color1 <- colorRampPalette(c("seashell2","seagreen2","turquoise2","palevioletred2"))(cohort.size)},
                      "3" = {color1 <- colorRampPalette(c("gray7","mediumblue","deeppink4","sienna3"))(cohort.size)},
                      "4" = {color1 <- colorRampPalette(c("darkslateblue","darkslategray4","deeppink4","tan4","gray10"))(cohort.size)},
@@ -104,7 +104,7 @@ CNV.by.method <- function(CNV_1,gene.name,pids,title,legend,legend.names,
   startPos <- start.CNV[index]
   endPos <- end.CNV[index]
   
-  if(method==""){
+  if(method=="sort.by.length"){
     rescore <- rep(100000000,m)
     score.values <- as.character(sort(unique(rescore)))
     n <- length(unique(rescore))
@@ -142,8 +142,8 @@ CNV.by.method <- function(CNV_1,gene.name,pids,title,legend,legend.names,
   }
   ## default/optional parameter for file.type (default = pdf) ----------------------------------------------------------------------------------------------------------
   if(missing(file.type)){ 
-    file.type1 <- pdf
-    plot.type <- file.type1
+    file.type <- pdf
+    plot.type <- file.type
   }else{
       plot.type <- file.type
       }
@@ -209,7 +209,12 @@ CNV.by.method <- function(CNV_1,gene.name,pids,title,legend,legend.names,
   }else if(method=="sblcbp"){
     sorting <- order(endPos - startPos) # sort by length, color by plotdy
   }
-  paralist <- list("gene.name"=gene.name,"cnv.type"=cnv.type,"title"=title,"pids"=pids,"legend"=lengend,
+  if(missing(start.gene)){start.gene <- "geneX"}
+  if(missing(end.gene)){end.gene <- "geneX"}
+  
+  
+  
+  paralist <- list("gene.name"=gene.name,"cnv.type"=cnv.type,"title"=title,"legend"=legend,
                    "legend.names"=legend.names,"file.type"=file.type,"out.dir"=out.dir,"pixel.per.cnv"=pixel.per.cnv,
                    "color"=color,"sorting"=sorting,"start.gene"=start.gene,"end.gene"=end.gene,"gene.anno"=gene.anno,
                    "chrom"=chrom,"start.CNV"=start.CNV,"end.CNV"=end.CNV,"rescore"=rescore,
@@ -271,7 +276,12 @@ plotCnvs.cohort <- function(){paralist,
     return()
   }
   y <- lengthChromosome(chroms[1],"bases") + 10000000
+  
+  
   plot.new()
+  png("/home/hongc/test/t1.png",width = 1024,height=768,units = "px")
+
+  
   par(c(5,3,4,4))
   pixelPerChrom <- chromWidth + (pixel.per.cnv)*(cnv.number+1)+10 # determines space between chromsomes
   x.size <- pixelPerChrom
@@ -316,16 +326,27 @@ plotCnvs.cohort <- function(){paralist,
     text(c(pixelPerChrom/2),c(10),labels = paste("score: ",f.score),cex=0.75)
   }
   
+  #p <- recordPlot()
+  #plot.new() ## clean up device
+  #p # redraw
+  
   # legend type decision ----------------------------------------------------------------------------
   if(legend=="missing" || legend==1){
     legend(xtr,legend=unique(cohorts),col=getColor.cohort(color=color,cohorts=cohorts,q=F),cex=0.75,pch=16) # normal legend
   }
   
-  if(legend==2){
-    par(new=T,mar=xtf )
-    pie(table(cohorts),col=getColor.cohort(color=color,cohorts=cohorts,q=F),cex=0.52) # piechart legend
-  }else{} # no legend
   
+  if(legend==2){
+    #par(new=T,mar=xtf )
+    par(new=T,mar=c(2,12,10,1))
+    pie(table(cohorts),col=color,cex=0.52) # piechart legend
+  }
+  
+plot_grid(p,q)
+p1 <- as.grob(p)
+
+
+
   if(display == TRUE){}else{dev.off()}
   
 }
@@ -339,8 +360,11 @@ plotCnv.cohort <- function(chroms,starts,ends,y,chromWidth,pixel.per.cnv,cohorts
   indX <- chroms == 'X'
   indY <- chroms == 'Y'
   len <- length(starts)
-  GetColor(method=method,color=color,cohorts=cohorts,q=TRUE)
+  color.value <- GetColor(method=method,color=color,cohorts=cohorts,q=TRUE)
+  startPoint <- chromWidth
   #getColor(color=color,cohorts=cohorts,q=TRUE) # source in the color palette (argument from package function)
+  
+  
   
   # Autosomes
   for(index in 1:len){
