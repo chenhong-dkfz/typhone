@@ -1,9 +1,14 @@
+# dependencies
+library(png)
+library(grid)
+
+
 # get colors
 
 GetColor <- function(method,score,color,score.values,n,q,cohorts){
   switch(method,
          
-         "confidence" = {
+         "by.confidence" = {
            color.value <- "black"
            switch (score,
                    "1" = {color.value = "grey"},
@@ -13,7 +18,7 @@ GetColor <- function(method,score,color,score.values,n,q,cohorts){
            )
          },
          
-         "ploidy" = {
+         "by.ploidy" = {
            # need redo
            if(score==0){
              color.value = color[1]
@@ -22,7 +27,7 @@ GetColor <- function(method,score,color,score.values,n,q,cohorts){
            }
          },
          
-         "ploidy2" = {
+         "by.ploidy2" = {
            # need redo
            if(missing(score)){
              color.value <- color[length(score.values)+1]
@@ -31,31 +36,33 @@ GetColor <- function(method,score,color,score.values,n,q,cohorts){
            }
          },
          
-         "cohort" = {
-           if(missing(color)){
-             cohort.size <- length(unique(cohorts))
-             color1 <- colorRampPalette(c("red2","indianred4","royalblue4","steelblue1","chartreuse3","darkgreen"))(cohort.size)
-           }else{
-             switch (color,
-                     "1" = {color1 <- rainbow(cohort.size)},
-                     "2" = {color1 <- colorRampPalette(c("seashell2","seagreen2","turquoise2","palevioletred2"))(cohort.size)},
-                     "3" = {color1 <- colorRampPalette(c("gray7","mediumblue","deeppink4","sienna3"))(cohort.size)},
-                     "4" = {color1 <- colorRampPalette(c("darkslateblue","darkslategray4","deeppink4","tan4","gray10"))(cohort.size)},
-                     "5" = {color1 <- colorRampPalette(c("navajowhite3","orange3","olivedrab3"))(cohort.size)},
-                     "6" = {color1 <- colorRampPalette(c("royalblue2","yellow1"))(cohort.size)},
-                     "7" = {color1 <- gray.colors(cohort.size)}
-             )
-           }
-         
-         color <- palette(color1)
-         if(q==TRUE){return(color1)}else{return(color)}
+         "by.cohort" = {
+           if(length(color)!=1){
+            if(missing(color)){
+               cohort.size <- length(unique(cohorts))
+              color1 <- colorRampPalette(c("red2","indianred4","royalblue4","steelblue1","chartreuse3","darkgreen"))(cohort.size)
+            }else{
+               switch (color,
+                       "1" = {color1 <- rainbow(cohort.size)},
+                       "2" = {color1 <- colorRampPalette(c("seashell2","seagreen2","turquoise2","palevioletred2"))(cohort.size)},
+                       "3" = {color1 <- colorRampPalette(c("gray7","mediumblue","deeppink4","sienna3"))(cohort.size)},
+                       "4" = {color1 <- colorRampPalette(c("darkslateblue","darkslategray4","deeppink4","tan4","gray10"))(cohort.size)},
+                      "5" = {color1 <- colorRampPalette(c("navajowhite3","orange3","olivedrab3"))(cohort.size)},
+                      "6" = {color1 <- colorRampPalette(c("royalblue2","yellow1"))(cohort.size)},
+                      "7" = {color1 <- gray.colors(cohort.size)}
+              )
+            }
+          if(missing(color1)){color1 <- gray.colors(cohort.size)}
+          color <- palette(color1)
+          if(q==TRUE){return(color1)}else{return(color)}
+           }else{return(color)}
          },
         
-         "length" = {
+         "by.length" = {
            color.value <- color
          },
          
-         "factor" = {
+         "by.factor" = {
            color.value <- "black"
          }
   )
@@ -91,7 +98,7 @@ setGeneric('plotCNV', function(object, ...) standardGeneric('plotCNV'))
 
 CNV.by.method <- function(CNV_1,gene.name,pids,title,legend,legend.names,
                           out.dir,file.type,pixel.per.cnv,color,display,
-                          gene.anno,start.gene,end.gene){
+                          gene.anno,start.gene,end.gene,method){
   # solid parameters
   chrom = as.vector(seqnames(CNV_1))
   start.CNV=start(CNV_1)
@@ -104,7 +111,7 @@ CNV.by.method <- function(CNV_1,gene.name,pids,title,legend,legend.names,
   startPos <- start.CNV[index]
   endPos <- end.CNV[index]
   
-  if(method=="sort.by.length"){
+  if(method=="by.length"){
     rescore <- rep(100000000,m)
     score.values <- as.character(sort(unique(rescore)))
     n <- length(unique(rescore))
@@ -141,27 +148,27 @@ CNV.by.method <- function(CNV_1,gene.name,pids,title,legend,legend.names,
     legend.names <- legend.names
   }
   ## default/optional parameter for file.type (default = pdf) ----------------------------------------------------------------------------------------------------------
-  if(missing(file.type)){ 
-    file.type <- pdf
-    plot.type <- file.type
-  }else{
-      plot.type <- file.type
-      }
+  #if(missing(file.type)){ 
+  #  file.type <- pdf
+  #  plot.type <- file.type
+  #}else{
+  #    plot.type <- file.type
+  #    }
   ## default/optional parameter for out.dir (defaultdirectory = "/Users/CNV.by.cohort") --------------------------------------------------------------------------------
-  if(missing(out.dir)){
-    if(missing(file.type)){
-      out.dir <- paste("CNV.by.length","_",gene.name,".","pdf",sep = "")
-    }else{
-        out.dir <- paste("CNV.by.length","_",gene.name,".",substitute(file.type),sep = "") 
-        }
-  }else{
-    if(missing(file.type)){
-      out.dir <- paste(out.dir,"_",gene.name,".","pdf",sep="")
-    }else{
-        out.dir <- paste(out.dir,"_",gene.name,".",substitute(file.type),sep="") 
-        }
-  }
-  out.fp <- out.dir
+  #if(missing(out.dir)){
+  #  if(missing(file.type)){
+  #    out.dir <- paste("CNV.by.length","_",gene.name,".","pdf",sep = "")
+  #  }else{
+  #      out.dir <- paste("CNV.by.length","_",gene.name,".",substitute(file.type),sep = "") 
+  #      }
+  #}else{
+  #  if(missing(file.type)){
+  #    out.dir <- paste(out.dir,"_",gene.name,".","pdf",sep="")
+  #  }else{
+  #      out.dir <- paste(out.dir,"_",gene.name,".",substitute(file.type),sep="") 
+  #      }
+  #}
+  #out.fp <- out.dir
   if(missing(pixel.per.cnv)){
     pixel.per.cnv <- 200/m
     }  ## better a equation dependened on the number of CNVs (index!)
@@ -192,9 +199,9 @@ CNV.by.method <- function(CNV_1,gene.name,pids,title,legend,legend.names,
   
   ## sorting ----------------------------------------------------------------------------------------------------------------------------------------------------------
   
-  if(method=="sort.by.length"){
+  if(method=="by.length"){
     sorting <- order(endPos - startPos) # sort by length
-  }else if(method=="sort.by.cohort"){
+  }else if(method=="by.cohort"){
     if(missing(cohort)){
       print("use CNV.by.ploidy or CNV.by.length functions")
       }else{
@@ -212,7 +219,9 @@ CNV.by.method <- function(CNV_1,gene.name,pids,title,legend,legend.names,
   if(missing(start.gene)){start.gene <- "geneX"}
   if(missing(end.gene)){end.gene <- "geneX"}
   
-  
+  file.type="default"
+  out.dir="default"
+  out.fp <- out.dir
   
   paralist <- list("gene.name"=gene.name,"cnv.type"=cnv.type,"title"=title,"legend"=legend,
                    "legend.names"=legend.names,"file.type"=file.type,"out.dir"=out.dir,"pixel.per.cnv"=pixel.per.cnv,
@@ -224,8 +233,7 @@ CNV.by.method <- function(CNV_1,gene.name,pids,title,legend,legend.names,
 
 
 # definition of focallity score
-focallity.score <- function(m,ends,starts)
-{
+focallity.score <- function(m,ends,starts){
   mean.length <-  (sum(ends - starts))/m
   range <- range(ends - starts)
   range.length <- range[2]-range[1]
@@ -240,7 +248,7 @@ focallity.score <- function(m,ends,starts)
 
 # implement plotCNVs
 
-plotCnvs.cohort <- function(){paralist,
+plotCnvs.cohort <- function(paralist,SaveAsObject){
   chrom = unlist(paralist["chrom"])
   startPos = unlist(paralist["startPos"])
   endPos = unlist(paralist["endPos"])
@@ -278,9 +286,9 @@ plotCnvs.cohort <- function(){paralist,
   y <- lengthChromosome(chroms[1],"bases") + 10000000
   
   
+  
   plot.new()
   png("/home/hongc/test/t1.png",width = 1024,height=768,units = "px")
-
   
   par(c(5,3,4,4))
   pixelPerChrom <- chromWidth + (pixel.per.cnv)*(cnv.number+1)+10 # determines space between chromsomes
@@ -301,8 +309,8 @@ plotCnvs.cohort <- function(){paralist,
     paintCytobands(chroms[1],pos=c(chromWidth,y),units="bases",width=chromWidth,orientation="v",legend=FALSE)
   }
   
-  plotCnv.cohort(chroms,starts,ends,y,chromWidth=chromWidth,pixel.per.cnv=pixel.per.cnv,cohorts=cohorts,startPoint=chromWidth,getColor=getColor.cohort,color=color)
-  
+  plotCnv.cohort(chroms,starts,ends,y,chromWidth=chromWidth,pixel.per.cnv=pixel.per.cnv,cohorts=cohorts,startPoint=chromWidth,method=method,color=color)
+
   
   # legend position decision (top or bottom)
   centro <- c(125,93.3,91,50.4,48.4,61,59.9,45.6,49,40.2,53.7,35.8,17.9,17.6,19,36.6,24,17.2,26.5,27.5,13.2,14.7,60.6,12.5)*1000000
@@ -325,29 +333,27 @@ plotCnvs.cohort <- function(){paralist,
     xtf <- c(21.5,24,4,3)
     text(c(pixelPerChrom/2),c(10),labels = paste("score: ",f.score),cex=0.75)
   }
+
   
-  #p <- recordPlot()
-  #plot.new() ## clean up device
-  #p # redraw
   
   # legend type decision ----------------------------------------------------------------------------
   if(legend=="missing" || legend==1){
-    legend(xtr,legend=unique(cohorts),col=getColor.cohort(color=color,cohorts=cohorts,q=F),cex=0.75,pch=16) # normal legend
+    legend(xtr,legend=unique(cohorts),col=GetColor(color=color,cohorts=cohorts,q=F,method="by.cohort"),cex=0.75,pch=16) # normal legend
   }
   
   
   if(legend==2){
-    #par(new=T,mar=xtf )
-    par(new=T,mar=c(2,12,10,1))
+    par(new=T,mar=xtf )
+    #par(new=T,mar=c(2,12,10,1))
     pie(table(cohorts),col=color,cex=0.52) # piechart legend
   }
   
-plot_grid(p,q)
-p1 <- as.grob(p)
-
-
-
-  if(display == TRUE){}else{dev.off()}
+  dev.off()
+  if(SaveAsObject==TRUE){
+    img <- readPNG("/home/hongc/test/t1.png")
+    g <- rasterGrob(img, interpolate=TRUE)
+    return(g)
+  }
   
 }
 
@@ -355,8 +361,7 @@ p1 <- as.grob(p)
 # implement plotCNV
 
 
-plotCnv.cohort <- function(chroms,starts,ends,y,chromWidth,pixel.per.cnv,cohorts,startPoint,color,method)
-{
+plotCnv.cohort <- function(chroms,starts,ends,y,chromWidth,pixel.per.cnv,cohorts,startPoint,color,method){
   indX <- chroms == 'X'
   indY <- chroms == 'Y'
   len <- length(starts)
