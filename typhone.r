@@ -2,10 +2,62 @@
 library(png)
 library(grid)
 
+# test data set generation
+
+CNV <- data.frame(Chromosome=c(rep(12,2000)),
+                  Start=c(round(runif(n=2000,min=15000000,max=35000000))),
+                  End=c(round(runif(n=2000,min=1500000,max=35000000))),
+                  Score=c(round(runif(n=2000,min=1,max=12))),Gene=c(rep("gene",2000)),
+                  Cohort=sample(c("BRCA","AML","CML","CRC","GLIOMA"),size=2000,
+                                prob=c(0.45,0.2,0.05,0.15,0.15),replace = T),
+                  PID=c(stringi::stri_rand_strings(n=2000, length=9, pattern = "[A-Za-z0-9]")))
+
+CNV <- cbind(CNV,length=CNV$Start-CNV$End)
+CNV <- CNV[CNV$length <= 0,]
+library(GenomicRanges)
+CNV <- makeGRangesFromDataFrame(CNV , keep.extra.columns = TRUE)
+KRAS <- GRanges(seqnames =Rle(12) , ranges=IRanges(start=25204789,end=25250936))
+CNV.KRAS <- subsetByOverlaps(CNV,KRAS)
+
+
+#
+
+
+# test function 1
+CNV.by.method(CNV_1,gene.name,pids,title,legend,legend.names,
+              out.dir,file.type,pixel.per.cnv,color,display,
+              gene.anno,start.gene,end.gene)
+
+pa1 = CNV.by.method(CNV_1=CNV.KRAS,method="by.length")
+pa2 = plotCnvs.cohort(paralist=pa1,SaveAsObject=TRUE)
+grid.arrange(pa2,pa2,nrow=1)
+
+
+## try classes
+CNV_single = setClass("CNV_single",
+                      slots = list(
+                        name = "character",
+                        matrix = "GenomicRanges",
+                        gene_name = "character"
+                      ))
+
+
+test_cnv <- new("CNV_single",name="CNV_test",matrix=CNV.KRAS,gene_name="KRAS")
+test_cnv_twin <- new("CNV_twin",name="Twin_Test",matrix_1=CNV.KRAS,matrix_2=CNV.STK38L,gene_name_1="KRAS",gene_name_2="STK38L")
+
+
+
+
 
 # get colors
 
 GetColor <- function(method,score,color,score.values,n,q,cohorts){
+  if(missing(score)){score=0}
+  if(missing(score.values)){score.values=0}
+  if(missing(n)){n=0}
+  if(missing(q)){q=0}
+  if(missing(cohorts)){cohort=c("all_patients")}
+  
   switch(method,
          
          "by.confidence" = {
@@ -91,14 +143,42 @@ CNV_twin = setClass("CNV_twin",
 
 # set generic plotCNV and plotCNVs(plot single CNV and CNV twin)
 
+setGeneric('TornadoPlots', function(object, ...) standardGeneric('TornadoPlots'))
 setGeneric('plotCNVs', function(object, ...) standardGeneric('plotCNVs'))
 setGeneric('plotCNV', function(object, ...) standardGeneric('plotCNV'))
 
+# setMethod for TornadoPlots
+setMethod("TornadoPlots",signature("CNV_single"),function(object,gene.name,pids,title,legend,legend.names,
+                                  out.dir,file.type,pixel.per.cnv,color,display,
+                                  gene.anno,start.gene,end.gene,method,SaveAsObject){
+  paralist0 <- CNV.by.method(object,gene.name,pids,title,legend,legend.names,
+                             out.dir,file.type,pixel.per.cnv,color,display,
+                             gene.anno,start.gene,end.gene,method)
+  if(SaveAsObject==TRUE){
+    plot0 <- plotCnvs.cohort(paralist=paralist0,SaveAsObject = SaveAsObject)
+  }else{
+    print("Output image is saved!!")
+  }
+})
+
+setMethod("TornadoPlots",signature("CNV_twin"),function(){
+  paralist0 <- PlotTwinsInit()
+  if(SaveAsObject==TRUE){
+    plot0 <- PlotTwins(paralist=paralist0,SaveAsObject=SaveAsObject)
+  }else{
+    print("Output image is saved!!")
+  }
+})
+
+
+
 # CNV plot first step
 
-CNV.by.method <- function(CNV_1,gene.name,pids,title,legend,legend.names,
+CNV.by.method <- function(CNV.input,gene.name,pids,title,legend,legend.names,
                           out.dir,file.type,pixel.per.cnv,color,display,
                           gene.anno,start.gene,end.gene,method){
+  
+  CNV_1 <- CNV.input@matrix
   # solid parameters
   chrom = as.vector(seqnames(CNV_1))
   start.CNV=start(CNV_1)
@@ -126,7 +206,6 @@ CNV.by.method <- function(CNV_1,gene.name,pids,title,legend,legend.names,
   }
   
   if(1>0){
-  
   if(missing(gene.name)){gene.name <- "geneX"}
   cnv.type <- gene.name 
   if(missing(title)){
@@ -147,28 +226,6 @@ CNV.by.method <- function(CNV_1,gene.name,pids,title,legend,legend.names,
   }else{
     legend.names <- legend.names
   }
-  ## default/optional parameter for file.type (default = pdf) ----------------------------------------------------------------------------------------------------------
-  #if(missing(file.type)){ 
-  #  file.type <- pdf
-  #  plot.type <- file.type
-  #}else{
-  #    plot.type <- file.type
-  #    }
-  ## default/optional parameter for out.dir (defaultdirectory = "/Users/CNV.by.cohort") --------------------------------------------------------------------------------
-  #if(missing(out.dir)){
-  #  if(missing(file.type)){
-  #    out.dir <- paste("CNV.by.length","_",gene.name,".","pdf",sep = "")
-  #  }else{
-  #      out.dir <- paste("CNV.by.length","_",gene.name,".",substitute(file.type),sep = "") 
-  #      }
-  #}else{
-  #  if(missing(file.type)){
-  #    out.dir <- paste(out.dir,"_",gene.name,".","pdf",sep="")
-  #  }else{
-  #      out.dir <- paste(out.dir,"_",gene.name,".",substitute(file.type),sep="") 
-  #      }
-  #}
-  #out.fp <- out.dir
   if(missing(pixel.per.cnv)){
     pixel.per.cnv <- 200/m
     }  ## better a equation dependened on the number of CNVs (index!)
@@ -208,7 +265,7 @@ CNV.by.method <- function(CNV_1,gene.name,pids,title,legend,legend.names,
         cohort <- cohort[index]
         sorting <- order(cohort,endPos - startPos)
       }
-  }else if(method=="sort.by.ploidy"){
+  }else if(method=="by.ploidy"){
     sorting <- order(rescore,endPos - startPos) # sort by score and then by length, sort by ploidy
   }else if(method=="sblcbc"){
     sorting <- order(endPos - startPos) # sort by length, color by cohort
@@ -230,6 +287,302 @@ CNV.by.method <- function(CNV_1,gene.name,pids,title,legend,legend.names,
                     "index"=index,"m"=m,"startPos"=startPos,"endPos"=endPos)
   return(paralist)
 }
+
+
+
+
+
+PlotTwinsInit <- function(twin.cnv,
+                          pids,file.type,out.dir,
+                          out.fp,title,pixel.per.cnv,plot.type,
+                          method,legend,legend.names,color,score.values_1,score.values_2,
+                          n_1,n_2,display,gene.anno,cnv.type_1,cnv.type_2,start.gene_1,start.gene_2,
+                          end.gene_1,end.gene_2){
+  CNV_1 <- twin.cnv@matrix_1
+  CNV_2 <- twin.cnv@matrix_2
+  
+  chrom_1 <- as.vector(seqnames(CNV_1))
+  start.CNV_1 <- start(CNV_1)
+  end.CNV_1 <- end(CNV_1)
+  score_1 <- CNV_1$Score
+  
+  chrom_2 <- as.vector(seqnames(CNV_2))
+  start.CNV_2 <- start(CNV_2)
+  end.CNV_2 <- end(CNV_2)
+  score_2 <- CNV_2$Score
+  
+  gene.name_1 <- as.character(twin.cnv@gene_name_1)
+  gene.name_2 <- as.character(twin.cnv@gene_name_2)
+  
+  index_1 <- (end.CNV_1 - start.CNV_1) < 10000000 # only events shorter than 10 M
+  m_1 <- sum(index_1)
+  startPos_1 <- start.CNV_1[index_1]
+  endPos_1 <- end.CNV[index_1]
+  rescore_1 <- rep(gene.name_1,m_1)
+  score.values_1 <- as.character(sort(unique(rescore_1)))
+  n_1 <- length(unique(rescore_1))
+  
+  index_2 <- (end.CNV_2 - start.CNV_2) < 10000000 # only events shorter than 10 M
+  m_2 <- sum(index_2)
+  startPos_2 <- start.CNV_2[index_2]
+  endPos_2 <- end.CNV_2[index_2]
+  rescore_2 <- rep(gene.name_2,m_2)
+  score.values_2 <- as.character(sort(unique(rescore_2)))
+  n_2 <- length(unique(rescore_2))
+  
+  ## default/optional parameter for gene name (default = "geneX")-------------------------------------------------------------------------------------------------------
+  if(missing(gene.name_1))  # if no argument is given --> gene.name is "geneX"
+  {gene.name_1 <- "geneX"}
+  cnv.type_1 <- gene.name_1   # assign gene.name to cnv.type --> can be replaced later on
+  
+  if(missing(gene.name_2))  # if no argument is given --> gene.name is "geneX"
+  {gene.name_2 <- "geneY"}
+  cnv.type_2 <- gene.name_2   # assign gene.name to cnv.type --> can be replaced later on
+  
+  ## default/optional parameter for "pids" and "title" (default:"gene.name: m events from unkown amount of unique samples")---------------------------------------------------------
+  if(missing(title)){
+    if(missing(pids)){
+      title <- paste(cnv.type_1,"&",cnv.type_2) 
+    }else{
+      title <- paste(cnv.type_1,":",m_1,"events from",length(unique(pids[index_1])),"samples") } # normal title genereated when pids given
+  }else{
+    if(missing(pids)){
+      title <- title
+    }else{
+      title <- paste(title,":",m_1,"events from",length(unique(pids[index_1])),"samples") } # normal title genereated when pids given
+  }
+  
+  ## default/optional parameter for legend (default = "missing" processed to "normal legend")
+  if(missing(legend)){legend <- "missing"}
+  
+  ## default/optional parameter for legend.names
+  if(missing(legend.names)){
+    legend.names <- c(score.values_2[1:n_2]) # ??
+  }else{
+    legend.names <- c(legend.names)[1:n_1]
+  }
+  ## default/optional parameter for file.type (default = pdf) ----------------------------------------------------------------------------------------------------------
+  if(missing(file.type)){
+    file.type <- pdf
+    plot.type <- pdf
+  }else{
+    plot.type <- file.type
+  }
+  
+  ## default/optional parameter for out.dir (defaultdirectory = "/package/TornadoCNV") --------------------------------------------------------------------------------
+  if(missing(out.dir)){
+    if(missing(file.type)){
+      out.dir <- paste("twins.by.length","_",gene.name_1,"&",gene.name_2,".","pdf",sep = "") 
+    }else{
+      out.dir <- paste("twins.by.length","_",gene.name_1,"&",gene.name_2,".",sep = "") }
+  }else{
+    if(missing(file.type)){
+      out.dir <- paste(out.dir,"_",gene.name_1,"&",gene.name_2,".","pdf",sep="") 
+    }else{
+      out.dir <- paste(out.dir,"_",gene.name_1,"&",gene.name_2,".",sep="") 
+    }
+  }
+  out.fp <- out.dir
+  
+  ## default/optional parameter for pixel.per.cnv (default = 5)---------------------------------------------------------------------------------------------------------
+  if(missing(pixel.per.cnv)){pixel.per.cnv <- 200/(m_1+m_2)}  ## better a equation dependened on the number of CNVs (index!)
+  
+  ## sorting ----------------------------------------------------------------------------------------------------------------------------------------------------------
+  
+  sorting_1 <- rev(order(endPos_1 - startPos_1)) # sort by length #### add ??
+  sorting_2 <- order(endPos_2 - startPos_2)
+  
+  ## color ------------------------------------------------------------------------------------------------------------------------------------------------------------
+  if(missing(color)){
+    color <- "steelblue3"
+  }else{
+    color <- color
+  }
+  
+  ## where to plot?----------------------------------------------------------------------------------------------------------------------------------------------------
+  if(missing(display)){
+    display <- ""
+  }
+  
+  ## gene anno?----------------------------------------------------------------------------------------------------------------------------------------------------
+  if(missing(gene.anno)){
+    gene.anno <- ""
+  }
+  
+  if(missing(start.gene_1)){start.gene_1 <- "geneX"}
+  if(missing(end.gene_1)){end.gene_1 <- "geneX"}
+  if(missing(start.gene_2)){start.gene_2 <- "geneY"}
+  if(missing(end.gene_2)){end.gene_2 <- "geneY"}
+  
+  
+  
+  ## gene.anno TRUE but missing start/end.gene------------------------
+  if(missing(start.gene_1) & gene.anno == TRUE){
+    print("start.gene 1 argument is missing")
+  }
+  
+  if(missing(end.gene_1) & gene.anno == TRUE){
+    print("end.gene 1 argument is missing")
+  }
+  
+  if(missing(end.gene_2) & gene.anno == TRUE){
+    print("end.gene 2 argument is missing")
+  }
+  
+  if(missing(end.gene_2) & gene.anno == TRUE){
+    print("end.gene 2 argument is missing")
+  }
+  
+  paralist <- list("gene.name_1"=gene.name_1,"gene.name_2"=gene.name_2,
+                   "cnv.type_1"=cnv.type_1,"cnv.type_2"=cnv.type_2,
+                   "title"=title,"legend"=legend,
+                   "legend.names"=legend.names,"file.type"=file.type,"out.dir"=out.dir,"pixel.per.cnv"=pixel.per.cnv,
+                   "color"=color,"sorting_1"=sorting_1,"sorting_2"=sorting_2,
+                   "start.gene_1"=start.gene_1,"end.gene_1"=end.gene_1,"start.gene_2"=start.gene_2,"end.gene_2"=end.gene_2,
+                   "gene.anno"=gene.anno,"n_1"=n_1,"n_2"=n_2,
+                   "chrom_1"=chrom_1,"start.CNV_1"=start.CNV_1,"end.CNV_1"=end.CNV_1,"rescore_1"=rescore_1,
+                   "chrom_2"=chrom_2,"start.CNV_2"=start.CNV_2,"end.CNV_2"=end.CNV_2,"rescore_2"=rescore_2,
+                   "index_1"=index_1,"index_2"=index_2,"m_1"=m_1,"m_2"=m_2,
+                   "startPos_1"=startPos_1,"endPos_1"=endPos_1,
+                   "startPos_2"=startPos_2,"endPos_2"=endPos_2)
+  
+  
+}
+
+
+PlotTwins <- function(paralist,SaveAsObject = SaveAsObject){
+  
+  chroms_1 <- unlist(paralist["chrom_1"])
+  starts_1 <- unlist(paralist["startPos_1"])
+  ends_1 <- unlist(paralist["endPos_1"])
+  scores_1 <- unlist(paralist["score_1"])
+  f.score_1 <- focallity.score(m=length(starts_1),starts = starts_1,ends = ends_1)
+  
+  chroms_2 <- unlist(paralist["chrom_2"])
+  starts_2 <- unlist(paralist["startPos_2"])
+  ends_2 <- unlist(paralist["endPos_2"])
+  scores_2 <- unlist(paralist["score_2"])
+  f.score_2 <- focallity.score(m=length(starts_2),starts = starts_2,ends = ends_2)
+  
+  cnv.number <- (length(chroms_1)+length(chroms_2)) # number of lines in input
+  chromWidth <- round((pixel.per.cnv * cnv.number) * 0.1)
+  
+  
+  if (length(unique(chroms_1)) > 1){
+    print(unique(chroms_1))
+    print("More than one chromosome id - use other function")
+    return()
+  }
+  
+  
+  if (length(unique(chroms_2)) > 1){
+    print(unique(chroms_2))
+    print("More than one chromosome id - use other function")
+    return()
+  }
+  
+  
+  y <- lengthChromosome(chroms_1[1],"bases") + 10000000  ## are you sure??
+  
+  # plot parameters -----------------------------------------------------------------------------------------------------------------
+  plot.new()
+  png("/home/hongc/test/t2.png",width = 1024,height=768,units = "px")
+  
+  par(c(5,3,4,4))
+  pixelPerChrom_1 <-  (pixel.per.cnv)*(length(chroms_1)+1)
+  pixelPerChrom_2 <-  (pixel.per.cnv)*(length(chroms_2)+1)
+  pixelPerChrom <- chromWidth+pixelPerChrom_1+pixelPerChrom_2+10 # determines space between chromsomes
+  
+  x.size <- pixelPerChrom
+  y.size <- y+100
+  plot(c(0,x.size),c(0,y.size),type="n",xaxt="n",yaxt="n",xlab="CNVs",ylab="Chromosomal location",main=title)
+  chrStr <- paste("chr",toString(chroms_1[1]))
+  text(c(pixelPerChrom_1+(chromWidth/2)),c(0),labels=c(chrStr))
+  
+  if(gene.anno == TRUE){
+    paintCytobands(chroms_1[1],pos=c(pixelPerChrom_1+chromWidth,y),units="bases",width=chromWidth,orientation="v",legend=FALSE)
+    m_1 <- mean(start.gene_1,end.gene_1)
+    m_2 <- mean(start.gene_2,end.gene_2)
+    
+    text(c(pixelPerChrom_1+chromWidth+15),c(y-m_1+(y*0.045)),labels=c(cnv.type_1),cex=0.7)
+    rect(pixelPerChrom_1+1,y-m_1,pixelPerChrom_1+chromWidth-1,y-m_1,col="gray50", border = "gray50")
+    lines(c(pixelPerChrom_1+chromWidth+7,pixelPerChrom_1+chromWidth+4),c(y-m_1+(y*0.03),y-m_1),col="gray50")
+    lines(c(pixelPerChrom_1+chromWidth+4,pixelPerChrom_1+chromWidth+1),c(y-m_1,y-m_1),col="gray50")
+    
+    text(c(pixelPerChrom_1-15),c(y-m_2-(y*0.045)),labels=c(cnv.type_2),cex=0.7)
+    rect(pixelPerChrom_1+1,y-m_2,pixelPerChrom_1+chromWidth-1,y-m_2,col="gray50", border = "gray50")
+    lines(c(pixelPerChrom_1-7,pixelPerChrom_1-4),c(y-m_2-(y*0.03),y-m_2),col="gray50")
+    lines(c(pixelPerChrom_1-4,pixelPerChrom_1-1),c(y-m_2,y-m_2),col="gray50")
+    
+  }else{
+    paintCytobands(chroms_1[1],pos=c(pixelPerChrom_1+chromWidth,y),units="bases",width=chromWidth,orientation="v",legend=FALSE)
+  }
+  
+  plotCnv(chroms_1,starts_1,ends_1,y,scores_1,pixel.per.cnv=pixel.per.cnv,method="by.length",color=color,score.values = score.values_1,n=n_1,startPoint=(pixelPerChrom_1),direction = "left")
+  plotCnv(chroms_2,starts_2,ends_2,y,scores_2,pixel.per.cnv=pixel.per.cnv,method="by.length",color=color,score.values = score.values_2,n=n_2,startPoint=(pixelPerChrom_1+chromWidth),direction = "right")
+  
+  #plotCnv.cohort <- function(chroms,starts,ends,y,chromWidth,pixel.per.cnv,cohorts,startPoint,color,method)
+  
+  # legend parameters ------------------------------------------------------------------------------------------------------
+  df.color.ploidy <- data.frame(color=color[1:n], # colors according to getColor.ploidy/2
+                                score=score.values[1:n], # score according to
+                                names=legend.names[1:n])
+  
+  data.score <- data.frame(score=c(sort(unique(scores)))) # unique and present scores of inout data
+  dtt <- df.color.ploidy[df.color.ploidy$score %in% data.score$score,] # subset only present scores of input data
+  color <- as.vector(dtt$color)
+  labs <- as.vector(dtt$names)
+  
+  # legend position decision (top or bottom)
+  centro <- c(125,93.3,91,50.4,48.4,61,59.9,45.6,49,40.2,53.7,35.8,17.9,17.6,19,36.6,24,17.2,26.5,27.5,13.2,14.7,60.6,12.5)*1000000
+  length <- lengthChromosome(c(1:22,"X","Y"),"bases")/2
+  genome <- data.frame(chromosome=c(1:22,"X","Y"), centromere=centro, length=length) # dataframe containing chromosome and centromere position info
+  
+  mean.pos <- mean(c(starts,ends)) # mean position of all CNV´s
+  #centroo <- genome[genome$chromosome %in% chroms,] # centromere position in the current chromosome
+  half.length <- genome[genome$chromosome %in% chroms,] # half of the length of the current chromosome
+  
+  if(mean.pos < half.length$length) {
+    xtr <- "bottomleft"
+    xtr2 <- "bottomright"
+    xtf <- c(4,5,20.5,22)
+    xtf2 <- c(4,24,20.5,3)
+    text(c(pixelPerChrom_1/2),c(y-10),labels = paste("score: ",f.score_1),cex=0.75)
+    text(c(pixelPerChrom_1+chromWidth+(pixelPerChrom_2/2)),c(y-10),labels = paste("score: ",f.score_2),cex=0.75)
+    
+  }    # mean start end smaller than subset chrom centromer
+  if(mean.pos > half.length$length){
+    xtr <- "topleft"
+    xtr2 <- "topright"
+    xtf <- c(21.5,5,4,22)
+    xtf2 <- c(21.5,24,4,3)
+    text(c(pixelPerChrom_1/2),c(10),labels = paste("score: ",f.score_1),cex=0.75)
+    text(c(pixelPerChrom_1+chromWidth+(pixelPerChrom_2/2)),c(10),labels = paste("score: ",f.score_2),cex=0.75)
+    
+  }
+  
+  # legend type decision ----------------------------------------------------------------------------
+  if(legend=="missing" || legend==1){
+    legend(xtr,legend=labs,col=color,cex=0.75,pch=16) # normal legend
+    legend(xtr2,legend=labs,col=color,cex=0.75,pch=16)
+  }
+  if(legend==2) {
+    par(new=T,mar=xtf )
+    pie(table(score_1),labels=labs,col=color,cex=0.52) # piechart legend
+    par(new=T,mar=xtf2)
+    pie(table(score_2),labels=labs,col=color,cex=0.52)
+  } else{} # no legend
+  
+  dev.off()
+  if(SaveAsObject==TRUE){
+    img <- readPNG("/home/hongc/test/t2.png")
+    g <- rasterGrob(img, interpolate=TRUE)
+    return(g)
+  }
+  
+  
+}
+
 
 
 # definition of focallity score
@@ -361,15 +714,66 @@ plotCnvs.cohort <- function(paralist,SaveAsObject){
 # implement plotCNV
 
 
+
+plotCnv <- function(chroms,starts,ends,y,scores,pixel.per.cnv,method,color,score.values,n,startPoint,direction){
+  
+  indX <- chroms == 'X'
+  indY <- chroms == 'Y'
+  
+  len <- length(starts)
+  if(missing(direction)){direction="right"}
+  if(direction=="right"){
+  # Autosomes
+    for(index in 1:len){
+      x <- startPoint + pixel.per.cnv*index
+      lines(c(x,x),c(y-starts[index],y-ends[index]),col="black",lwd=pixel.per.cnv)
+    }
+    
+    # X Chromosome
+    for(index in 1:len) {
+      if(indX[index] == TRUE){
+        x <- startPoint + pixel.per.cnv*index
+        lines(c(x,x),c(y-starts[index],y-ends[index]),col="black",lwd=pixel.per.cnv)
+      }
+    }
+    
+    # Y Chromosome
+    for(index in 1:len){
+      if(indY[index] == TRUE){
+        x <- startPoint + pixel.per.cnv*index
+        lines(c(x,x),c(y-starts[index],y-ends[index]),col="black",lwd=pixel.per.cnv)
+      }
+    }
+  }else{
+    for(index in 1:len){
+      x <- startPoint - pixel.per.cnv*index
+      lines(c(x,x),c(y-starts[index],y-ends[index]),col="black",lwd=pixel.per.cnv)
+    }
+    
+    # X Chromosome
+    for(index in 1:len) {
+      if(indX[index] == TRUE){
+        x <- startPoint - pixel.per.cnv*index
+        lines(c(x,x),c(y-starts[index],y-ends[index]),col="black",lwd=pixel.per.cnv)
+      }
+    }
+    
+    # Y Chromosome
+    for(index in 1:len){
+      if(indY[index] == TRUE){
+        x <- startPoint - pixel.per.cnv*index
+        lines(c(x,x),c(y-starts[index],y-ends[index]),col="black",lwd=pixel.per.cnv)
+      }
+    }
+  }
+}
+
 plotCnv.cohort <- function(chroms,starts,ends,y,chromWidth,pixel.per.cnv,cohorts,startPoint,color,method){
   indX <- chroms == 'X'
   indY <- chroms == 'Y'
   len <- length(starts)
   color.value <- GetColor(method=method,color=color,cohorts=cohorts,q=TRUE)
   startPoint <- chromWidth
-  #getColor(color=color,cohorts=cohorts,q=TRUE) # source in the color palette (argument from package function)
-  
-  
   
   # Autosomes
   for(index in 1:len){
