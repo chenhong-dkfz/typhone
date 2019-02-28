@@ -1,8 +1,12 @@
 # dependencies
 library(png)
 library(grid)
+library(GenomicRanges)
 
 # test data set generation
+
+test = 1
+if(test==0){
 
 CNV <- data.frame(Chromosome=c(rep(12,2000)),
                   Start=c(round(runif(n=2000,min=15000000,max=35000000))),
@@ -14,38 +18,58 @@ CNV <- data.frame(Chromosome=c(rep(12,2000)),
 
 CNV <- cbind(CNV,length=CNV$Start-CNV$End)
 CNV <- CNV[CNV$length <= 0,]
-library(GenomicRanges)
 CNV <- makeGRangesFromDataFrame(CNV , keep.extra.columns = TRUE)
 KRAS <- GRanges(seqnames =Rle(12) , ranges=IRanges(start=25204789,end=25250936))
 CNV.KRAS <- subsetByOverlaps(CNV,KRAS)
+
+CNV1 <- data.frame(Chromosome=c(rep(12,2000)),
+                   Start=c(round(runif(n=2000,min=15000000,max=35000000))),
+                   End=c(round(runif(n=2000,min=1500000,max=35000000))),
+                   Score=sample(c(1:6),size=2000,
+                                prob=c(0.01,0.1,0.04,0.15,0.65,0.15),replace = TRUE),
+                   Gene=rep("KRAS",2000),
+                   Cohort=sample(c("BRCA","AML","CML","CRC","GLIOMA"),size=2000,
+                                 prob=c(0.45,0.2,0.05,0.15,0.15),replace = T),
+                   PID=c(stringi::stri_rand_strings(n=2000, length=9, pattern = "[A-Za-z0-9]")))
+
+CNV2 <- data.frame(Chromosome=c(rep(12,2000)),
+                   Start=c(round(runif(n=2000,min=13000000,max=34000000))),
+                   End=c(round(runif(n=2000,min=1300000,max=34000000))),
+                   Score=sample(c(1:6),size=2000,
+                                prob=c(0.15,0.5,0.1,0.05,0.15,0.05),replace = TRUE),
+                   Gene=rep("STK38L",2000),
+                   Cohort=sample(c("BRCA","AML","CML","CRC","GLIOMA"),size=2000,
+                                 prob=c(0.55,0.1,0.15,0.05,0.15),replace = T),
+                   PID=c(stringi::stri_rand_strings(n=2000, length=9, pattern = "[A-Za-z0-9]")))
+
+# subsetting positive length
+CNV1 <- cbind(CNV1,length=CNV1$Start-CNV1$End)
+CNV1 <- CNV1[CNV1$length <= 0,]
+
+CNV2 <- cbind(CNV2,length=CNV2$Start-CNV2$End)
+CNV2 <- CNV2[CNV2$length <= 0,]
+
+# creating GenomicRange data
+library(GenomicRanges)
+CNV1 <- makeGRangesFromDataFrame(CNV1 , keep.extra.columns = TRUE)
+CNV2 <- makeGRangesFromDataFrame(CNV2 , keep.extra.columns = TRUE)
+KRAS <- GRanges(seqnames =Rle(12) , ranges=IRanges(start=25204789,end=25250936))
+STK38L <- GRanges(seqnames =Rle(12) , ranges=IRanges(start=27396901,end=27478892))
+
+# subsetting overlays with KRAS region
+CNV.KRAS <- subsetByOverlaps(CNV1,KRAS)
+CNV.STK38L <- subsetByOverlaps(CNV2,STK38L)
 
 
 #
 
 
-# test function 1
-CNV.by.method(CNV_1,gene.name,pids,title,legend,legend.names,
-              out.dir,file.type,pixel.per.cnv,color,display,
-              gene.anno,start.gene,end.gene)
-
-pa1 = CNV.by.method(CNV_1=CNV.KRAS,method="by.length")
-pa2 = plotCnvs.cohort(paralist=pa1,SaveAsObject=TRUE)
-grid.arrange(pa2,pa2,nrow=1)
-
-
-## try classes
-CNV_single = setClass("CNV_single",
-                      slots = list(
-                        name = "character",
-                        matrix = "GenomicRanges",
-                        gene_name = "character"
-                      ))
-
 
 test_cnv <- new("CNV_single",name="CNV_test",matrix=CNV.KRAS,gene_name="KRAS")
 test_cnv_twin <- new("CNV_twin",name="Twin_Test",matrix_1=CNV.KRAS,matrix_2=CNV.STK38L,gene_name_1="KRAS",gene_name_2="STK38L")
+bb <- plotCnvs.cohort(paralist=para1,SaveAsObject = SaveAsObject)
 
-
+}
 
 
 
@@ -55,7 +79,7 @@ GetColor <- function(method,score,color,score.values,n,q,cohorts){
   if(missing(score)){score=0}
   if(missing(score.values)){score.values=0}
   if(missing(n)){n=0}
-  if(missing(q)){q=0}
+  if(missing(q)){q=FALSE}
   if(missing(cohorts)){cohort=c("all_patients")}
   
   switch(method,
