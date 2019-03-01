@@ -2,10 +2,11 @@
 library(png)
 library(grid)
 library(GenomicRanges)
-
+library(quantsmooth)
+library(gridExtra)
 # test data set generation
 
-test = 1
+test = 0
 if(test==0){
 
 CNV <- data.frame(Chromosome=c(rep(12,2000)),
@@ -308,7 +309,8 @@ CNV.by.method <- function(CNV.input,gene.name,pids,title,legend,legend.names,
                    "legend.names"=legend.names,"file.type"=file.type,"out.dir"=out.dir,"pixel.per.cnv"=pixel.per.cnv,
                    "color"=color,"sorting"=sorting,"start.gene"=start.gene,"end.gene"=end.gene,"gene.anno"=gene.anno,
                    "chrom"=chrom,"start.CNV"=start.CNV,"end.CNV"=end.CNV,"rescore"=rescore,
-                    "index"=index,"m"=m,"startPos"=startPos,"endPos"=endPos)
+                    "index"=index,"m"=m,"startPos"=startPos,"endPos"=endPos,
+                   "method"=method)
   return(paralist)
 }
 
@@ -491,7 +493,6 @@ PlotTwins <- function(paralist,SaveAsObject = SaveAsObject){
   cnv.number <- (length(chroms_1)+length(chroms_2)) # number of lines in input
   chromWidth <- round((pixel.per.cnv * cnv.number) * 0.1)
   
-  
   if (length(unique(chroms_1)) > 1){
     print(unique(chroms_1))
     print("More than one chromosome id - use other function")
@@ -510,7 +511,7 @@ PlotTwins <- function(paralist,SaveAsObject = SaveAsObject){
   
   # plot parameters -----------------------------------------------------------------------------------------------------------------
   plot.new()
-  png("/home/hongc/test/t2.png",width = 1024,height=768,units = "px")
+  png("t2.png",width = 1024,height=768,units = "px")
   
   par(c(5,3,4,4))
   pixelPerChrom_1 <-  (pixel.per.cnv)*(length(chroms_1)+1)
@@ -599,7 +600,7 @@ PlotTwins <- function(paralist,SaveAsObject = SaveAsObject){
   
   dev.off()
   if(SaveAsObject==TRUE){
-    img <- readPNG("/home/hongc/test/t2.png")
+    img <- readPNG("t2.png")
     g <- rasterGrob(img, interpolate=TRUE)
     return(g)
   }
@@ -636,8 +637,8 @@ plotCnvs.cohort <- function(paralist,SaveAsObject){
   pixel.per.cnv = unlist(paralist["pixel.per.cnv"])
   plot.type = unlist(paralist["plot.type"])
   # getcolor
-  lengend = unlist(paralist["legend"])
-  lengend.names = unlist(paralist["legend.names"])
+  legend.value = unlist(paralist["legend"])
+  legend.names = unlist(paralist["legend.names"])
   color = unlist(paralist["color"])
   score.values = unlist(paralist["score.values"])
   n = unlist(paralist["n"])
@@ -646,6 +647,7 @@ plotCnvs.cohort <- function(paralist,SaveAsObject){
   cnv.type = unlist(paralist["cnv.type"])
   start.gene = unlist(paralist["start.gene"])
   end.gene = unlist(paralist["end.gene"])
+  method = unlist(paralist["method"])
   
   chroms <- chrom[sorting]
   starts <- startPos[sorting]
@@ -655,6 +657,8 @@ plotCnvs.cohort <- function(paralist,SaveAsObject){
   cnv.number <-  length(chroms) # number of lines in input
   chromWidth <- round((pixel.per.cnv * cnv.number) * 0.1)
   f.score <- focallity.score(m=length(starts),starts = starts,ends = ends)
+  
+  
   if (length(unique(chroms)) > 1){
     print(unique(chroms))
     print("More than one chromosome id - use other function")
@@ -665,7 +669,7 @@ plotCnvs.cohort <- function(paralist,SaveAsObject){
   
   
   plot.new()
-  png("/home/hongc/test/t1.png",width = 1024,height=768,units = "px")
+  png("t1.png",width = 1024,height=768,units = "px")
   
   par(c(5,3,4,4))
   pixelPerChrom <- chromWidth + (pixel.per.cnv)*(cnv.number+1)+10 # determines space between chromsomes
@@ -714,6 +718,7 @@ plotCnvs.cohort <- function(paralist,SaveAsObject){
   
   
   # legend type decision ----------------------------------------------------------------------------
+  print(legend)
   if(legend=="missing" || legend==1){
     legend(xtr,legend=unique(cohorts),col=GetColor(color=color,cohorts=cohorts,q=F,method="by.cohort"),cex=0.75,pch=16) # normal legend
   }
@@ -727,7 +732,7 @@ plotCnvs.cohort <- function(paralist,SaveAsObject){
   
   dev.off()
   if(SaveAsObject==TRUE){
-    img <- readPNG("/home/hongc/test/t1.png")
+    img <- readPNG("t1.png")
     g <- rasterGrob(img, interpolate=TRUE)
     return(g)
   }
