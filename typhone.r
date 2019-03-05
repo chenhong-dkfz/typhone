@@ -85,7 +85,7 @@ GetColor <- function(method,score,color,score.values,n,q,cohorts){
   
   switch(method,
          
-         "by.confidence" = {
+         "confidence" = {
            color.value <- "black"
            switch (score,
                    "1" = {color.value = "grey"},
@@ -95,7 +95,7 @@ GetColor <- function(method,score,color,score.values,n,q,cohorts){
            )
          },
          
-         "by.ploidy" = {
+         "ploidy" = {
            # need redo
            if(score==0){
              color.value = color[1]
@@ -104,7 +104,7 @@ GetColor <- function(method,score,color,score.values,n,q,cohorts){
            }
          },
          
-         "by.ploidy2" = {
+         "ploidy2" = {
            # need redo
            if(missing(score)){
              color.value <- color[length(score.values)+1]
@@ -113,7 +113,7 @@ GetColor <- function(method,score,color,score.values,n,q,cohorts){
            }
          },
          
-         "by.cohort" = {
+         "cohort" = {
            if(length(color)!=1){
             if(missing(color)){
                cohort.size <- length(unique(cohorts))
@@ -135,11 +135,11 @@ GetColor <- function(method,score,color,score.values,n,q,cohorts){
            }else{return(color)}
          },
         
-         "by.length" = {
+         "length" = {
            color.value <- color
          },
          
-         "by.factor" = {
+         "factor" = {
            color.value <- "black"
          }
   )
@@ -175,10 +175,10 @@ setGeneric('plotCNV', function(object, ...) standardGeneric('plotCNV'))
 # setMethod for TornadoPlots
 setMethod("TornadoPlots",signature("CNV_single"),function(object,gene.name,pids,title,legend,legend.names,
                                   out.dir,file.type,pixel.per.cnv,color,display,
-                                  gene.anno,start.gene,end.gene,method,SaveAsObject){
+                                  gene.anno,start.gene,end.gene,color.method,sort.method,SaveAsObject){
   paralist0 <- CNV.by.method(object,gene.name,pids,title,legend,legend.names,
                              out.dir,file.type,pixel.per.cnv,color,display,
-                             gene.anno,start.gene,end.gene,method)
+                             gene.anno,start.gene,end.gene,color.method,sort.method)
   if(SaveAsObject==TRUE){
     plot0 <- plotCnvs.cohort(paralist=paralist0,SaveAsObject = SaveAsObject)
   }else{
@@ -201,7 +201,7 @@ setMethod("TornadoPlots",signature("CNV_twin"),function(){
 
 CNV.by.method <- function(CNV.input,gene.name,pids,title,legend,legend.names,
                           out.dir,file.type,pixel.per.cnv,color,display,
-                          gene.anno,start.gene,end.gene,method){
+                          gene.anno,start.gene,end.gene,sort.method,color.method){
   
   CNV_1 <- CNV.input@matrix
   # solid parameters
@@ -216,15 +216,21 @@ CNV.by.method <- function(CNV.input,gene.name,pids,title,legend,legend.names,
   startPos <- start.CNV[index]
   endPos <- end.CNV[index]
   
-  if(method=="by.length"){
+  if(missing(sort.method) & missing(color.method)){sort.method = "length"}
+  if(missing(sort.method)){sort.method = color.method}
+  if(missing(color.method)){color.method = sort.method}
+  
+  
+  
+  
+  if(sort.method=="length" & color.method=="length"){
     rescore <- rep(100000000,m)
     score.values <- as.character(sort(unique(rescore)))
     n <- length(unique(rescore))
   }
   
-  if(method=="pblcbp"){
-    if(missing(score))  # if no argument is given --> score is 4 (diploid)
-    {score <- rep(100000000,length(index))}
+  if(sort.method=="length" & color.method=="ploidy"){
+    if(missing(score)){score <- rep(100000000,length(index))}  # if no argument is given --> score is 4 (diploid)
     rescore <- unlist(lapply(score,map.ploidy.classes))[index]
     score.values <- as.character(sort(unique(rescore)))
     n <- length(unique(rescore))
@@ -281,21 +287,21 @@ CNV.by.method <- function(CNV.input,gene.name,pids,title,legend,legend.names,
   
   ## sorting ----------------------------------------------------------------------------------------------------------------------------------------------------------
   
-  if(method=="by.length"){
+  if(sort.method=="length"){
     sorting <- order(endPos - startPos) # sort by length
-  }else if(method=="by.cohort"){
+  }else if(sort.method=="cohort"){
     if(missing(cohort)){
       print("use CNV.by.ploidy or CNV.by.length functions")
       }else{
         cohort <- cohort[index]
         sorting <- order(cohort,endPos - startPos)
       }
-  }else if(method=="by.ploidy"){
+  }else if(sort.method=="ploidy"){
     sorting <- order(rescore,endPos - startPos) # sort by score and then by length, sort by ploidy
-  }else if(method=="sblcbc"){
+  }else if(sort.method=="length" & color.method=="cohort"){
     sorting <- order(endPos - startPos) # sort by length, color by cohort
     cohort <- cohort[index]
-  }else if(method=="sblcbp"){
+  }else if(sort.method=="length" & color.method=="ploidy"){
     sorting <- order(endPos - startPos) # sort by length, color by plotdy
   }
   if(missing(start.gene)){start.gene <- "geneX"}
@@ -310,7 +316,7 @@ CNV.by.method <- function(CNV.input,gene.name,pids,title,legend,legend.names,
                    "color"=color,"sorting"=sorting,"start.gene"=start.gene,"end.gene"=end.gene,"gene.anno"=gene.anno,
                    "chrom"=chrom,"start.CNV"=start.CNV,"end.CNV"=end.CNV,"rescore"=rescore,
                     "index"=index,"m"=m,"startPos"=startPos,"endPos"=endPos,
-                   "method"=method)
+                   "sort.method"=sort.method,"color.method"=color.method)
   return(paralist)
 }
 
@@ -637,7 +643,7 @@ plotCnvs.cohort <- function(paralist,SaveAsObject){
   pixel.per.cnv = unlist(paralist["pixel.per.cnv"])
   plot.type = unlist(paralist["plot.type"])
   # getcolor
-  legend.value = unlist(paralist["legend"])
+  legend = unlist(paralist["legend"])
   legend.names = unlist(paralist["legend.names"])
   color = unlist(paralist["color"])
   score.values = unlist(paralist["score.values"])
@@ -647,7 +653,8 @@ plotCnvs.cohort <- function(paralist,SaveAsObject){
   cnv.type = unlist(paralist["cnv.type"])
   start.gene = unlist(paralist["start.gene"])
   end.gene = unlist(paralist["end.gene"])
-  method = unlist(paralist["method"])
+  sort.method = unlist(paralist["sort.method"])
+  color.method = unlist(paralist["color.method"])
   
   chroms <- chrom[sorting]
   starts <- startPos[sorting]
@@ -718,7 +725,7 @@ plotCnvs.cohort <- function(paralist,SaveAsObject){
   
   
   # legend type decision ----------------------------------------------------------------------------
-  print(legend)
+  
   if(legend=="missing" || legend==1){
     legend(xtr,legend=unique(cohorts),col=GetColor(color=color,cohorts=cohorts,q=F,method="by.cohort"),cex=0.75,pch=16) # normal legend
   }
