@@ -68,8 +68,34 @@ CNV.STK38L <- subsetByOverlaps(CNV2,STK38L)
 
 test_cnv <- new("CNV_single",name="CNV_test",matrix=CNV.KRAS,gene_name="KRAS")
 test_cnv_twin <- new("CNV_twin",name="Twin_Test",matrix_1=CNV.KRAS,matrix_2=CNV.STK38L,gene_name_1="KRAS",gene_name_2="STK38L")
-bb <- plotCnvs.cohort(paralist=para1,SaveAsObject = SaveAsObject)
+#bb <- plotCnvs.cohort(paralist=para1,SaveAsObject = SaveAsObject)
 
+}
+
+
+# map classes
+
+MapPloidyClasses <- function(v){
+  class = 0
+  if(v<5){
+  switch(v,
+         "1" = {class = 2},
+         "2" = {class = 3},
+         "3" = {class = 4},
+         "4" = {class = 4}
+         )
+  }else if(v>=5 & v<=8){
+    class = 5
+  }else if(v>=9 & v<=99999999){
+    class = 6
+  }
+  return(class)
+}
+
+mp <- function(x){
+  switch(x,
+         "1"={return(1)},
+         "0"={return(0)})
 }
 
 
@@ -82,6 +108,7 @@ GetColor <- function(method,score,color,score.values,n,q,cohorts){
   if(missing(n)){n=0}
   if(missing(q)){q=FALSE}
   if(missing(cohorts)){cohort=c("all_patients")}
+  
   
   switch(method,
          
