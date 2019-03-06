@@ -76,7 +76,7 @@ test_cnv_twin <- new("CNV_twin",name="Twin_Test",matrix_1=CNV.KRAS,matrix_2=CNV.
 # map classes
 
 MapPloidyClasses <- function(v){
-  class = 0
+  class = 1
   if(v<5){
   switch(v,
          "1" = {class = 2},
@@ -88,17 +88,9 @@ MapPloidyClasses <- function(v){
     class = 5
   }else if(v>=9 & v<=99999999){
     class = 6
-  }
+  }else{class = v}
   return(class)
 }
-
-mp <- function(x){
-  switch(x,
-         "1"={return(1)},
-         "0"={return(0)})
-}
-
-
 
 # get colors
 
@@ -247,6 +239,9 @@ CNV.by.method <- function(CNV.input,gene.name,pids,title,legend,legend.names,
   if(missing(sort.method)){sort.method = color.method}
   if(missing(color.method)){color.method = sort.method}
   
+  score = CNV_1$Score
+  cohort = CNV_1$Cohort
+  pids = CNV_1$PID
   
   
   
@@ -258,7 +253,7 @@ CNV.by.method <- function(CNV.input,gene.name,pids,title,legend,legend.names,
   
   if(sort.method=="length" & color.method=="ploidy"){
     if(missing(score)){score <- rep(100000000,length(index))}  # if no argument is given --> score is 4 (diploid)
-    rescore <- unlist(lapply(score,map.ploidy.classes))[index]
+    rescore <- unlist(lapply(score,MapPloidyClasses))[index]
     score.values <- as.character(sort(unique(rescore)))
     n <- length(unique(rescore))
   }
@@ -329,7 +324,7 @@ CNV.by.method <- function(CNV.input,gene.name,pids,title,legend,legend.names,
     sorting <- order(endPos - startPos) # sort by length, color by cohort
     cohort <- cohort[index]
   }else if(sort.method=="length" & color.method=="ploidy"){
-    sorting <- order(endPos - startPos) # sort by length, color by plotdy
+    sorting <- order(endPos - startPos) # sort by length, color by ploidy
   }
   if(missing(start.gene)){start.gene <- "geneX"}
   if(missing(end.gene)){end.gene <- "geneX"}
@@ -343,6 +338,7 @@ CNV.by.method <- function(CNV.input,gene.name,pids,title,legend,legend.names,
                    "color"=color,"sorting"=sorting,"start.gene"=start.gene,"end.gene"=end.gene,"gene.anno"=gene.anno,
                    "chrom"=chrom,"start.CNV"=start.CNV,"end.CNV"=end.CNV,"rescore"=rescore,
                     "index"=index,"m"=m,"startPos"=startPos,"endPos"=endPos,
+                   "score"=score,"cohort"=cohort,"pids"=pids,
                    "sort.method"=sort.method,"color.method"=color.method)
   return(paralist)
 }
