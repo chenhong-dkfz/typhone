@@ -64,8 +64,6 @@ CNV.STK38L <- subsetByOverlaps(CNV2,STK38L)
 
 #
 
-
-
 test_cnv <- new("CNV_single",name="CNV_test",matrix=CNV.KRAS,gene_name="KRAS")
 test_cnv_twin <- new("CNV_twin",name="Twin_Test",matrix_1=CNV.KRAS,matrix_2=CNV.STK38L,gene_name_1="KRAS",gene_name_2="STK38L")
 #bb <- plotCnvs.cohort(paralist=para1,SaveAsObject = SaveAsObject)
@@ -94,11 +92,11 @@ MapPloidyClasses <- function(v){
 
 # get colors
 
-GetColor <- function(method,score,color,score.values,n,q,cohorts){
+GetColor <- function(method,score,color,score.values,n,greyscale,cohorts){
   if(missing(score)){score=0}
   if(missing(score.values)){score.values=0}
   if(missing(n)){n=0}
-  if(missing(q)){q=FALSE}
+  if(missing(greyscale)){greyscale=FALSE}
   if(missing(cohorts)){cohort=c("all_patients")}
   
   
@@ -133,27 +131,28 @@ GetColor <- function(method,score,color,score.values,n,q,cohorts){
          },
          
          "cohort" = {
-           if(length(color)!=1){
-            if(missing(color)){
-               cohort.size <- length(unique(cohorts))
-              color1 <- colorRampPalette(c("red2","indianred4","royalblue4","steelblue1","chartreuse3","darkgreen"))(cohort.size)
-            }else{
-               switch (color,
-                       "1" = {color1 <- rainbow(cohort.size)},
-                       "2" = {color1 <- colorRampPalette(c("seashell2","seagreen2","turquoise2","palevioletred2"))(cohort.size)},
-                       "3" = {color1 <- colorRampPalette(c("gray7","mediumblue","deeppink4","sienna3"))(cohort.size)},
-                       "4" = {color1 <- colorRampPalette(c("darkslateblue","darkslategray4","deeppink4","tan4","gray10"))(cohort.size)},
-                      "5" = {color1 <- colorRampPalette(c("navajowhite3","orange3","olivedrab3"))(cohort.size)},
-                      "6" = {color1 <- colorRampPalette(c("royalblue2","yellow1"))(cohort.size)},
-                      "7" = {color1 <- gray.colors(cohort.size)}
-              )
-            }
-          if(missing(color1)){color1 <- gray.colors(cohort.size)}
-          color <- palette(color1)
-          if(q==TRUE){return(color1)}else{return(color)}
-           }else{return(color)}
+           cohort.size <- length(unique(cohorts))
+           if(missing(color)){
+             color1 <- colorRampPalette(c("red2","indianred4","royalblue4","steelblue1","chartreuse3","darkgreen"))(cohort.size)
+           }else if(color>0 & color<8 & is.integer(color)==TRUE){
+             switch (color,
+                     "1" = {color1 <- rainbow(cohort.size)},
+                     "2" = {color1 <- colorRampPalette(c("seashell2","seagreen2","turquoise2","palevioletred2"))(cohort.size)},
+                     "3" = {color1 <- colorRampPalette(c("gray7","mediumblue","deeppink4","sienna3"))(cohort.size)},
+                     "4" = {color1 <- colorRampPalette(c("darkslateblue","darkslategray4","deeppink4","tan4","gray10"))(cohort.size)},
+                     "5" = {color1 <- colorRampPalette(c("navajowhite3","orange3","olivedrab3"))(cohort.size)},
+                     "6" = {color1 <- colorRampPalette(c("royalblue2","yellow1"))(cohort.size)},
+                     "7" = {color1 <- gray.colors(cohort.size)}
+             )
+           }else if(greyscale==TRUE){
+             color1 <- gray.colors(cohort.size)
+             color1 <- palette(color1)
+         }else{
+           color1 <- colorRampPalette(c("red2","indianred4","royalblue4","steelblue1","chartreuse3","darkgreen"))(cohort.size)
+           }
+           color.value <- color1
          },
-        
+         
          "length" = {
            color.value <- color
          },
@@ -678,6 +677,11 @@ plotCnvs.cohort <- function(paralist,SaveAsObject){
   end.gene = unlist(paralist["end.gene"])
   sort.method = unlist(paralist["sort.method"])
   color.method = unlist(paralist["color.method"])
+  score = unlist(paralist["score"])
+  pids = unlist(paralist["pids"])
+  cohort = unlist(paralist["cohort"])
+  
+  
   
   chroms <- chrom[sorting]
   starts <- startPos[sorting]
@@ -694,6 +698,7 @@ plotCnvs.cohort <- function(paralist,SaveAsObject){
     print("More than one chromosome id - use other function")
     return()
   }
+  
   y <- lengthChromosome(chroms[1],"bases") + 10000000
   
   
@@ -720,7 +725,9 @@ plotCnvs.cohort <- function(paralist,SaveAsObject){
     paintCytobands(chroms[1],pos=c(chromWidth,y),units="bases",width=chromWidth,orientation="v",legend=FALSE)
   }
   
-  plotCnv.cohort(chroms,starts,ends,y,chromWidth=chromWidth,pixel.per.cnv=pixel.per.cnv,cohorts=cohorts,startPoint=chromWidth,method=method,color=color)
+  plotCnv.cohort(chroms,starts,ends,y,
+                 chromWidth=chromWidth,pixel.per.cnv=pixel.per.cnv,
+                 cohorts=cohort,startPoint=chromWidth,method=color.method,color=color)
 
   
   # legend position decision (top or bottom)
@@ -748,6 +755,10 @@ plotCnvs.cohort <- function(paralist,SaveAsObject){
   
   
   # legend type decision ----------------------------------------------------------------------------
+  if(color.method=="cohort"){
+    legend.color <- GetColor(method="cohort",color=color,cohorts=cohort)
+  }
+  
   
   if(legend=="missing" || legend==1){
     legend(xtr,legend=unique(cohorts),col=GetColor(color=color,cohorts=cohorts,q=F,method="by.cohort"),cex=0.75,pch=16) # normal legend
@@ -757,7 +768,7 @@ plotCnvs.cohort <- function(paralist,SaveAsObject){
   if(legend==2){
     par(new=T,mar=xtf )
     #par(new=T,mar=c(2,12,10,1))
-    pie(table(cohorts),col=color,cex=0.52) # piechart legend
+    pie(table(cohorts),col=legend.color,cex=0.52) # piechart legend
   }
   
   dev.off()
@@ -831,13 +842,19 @@ plotCnv.cohort <- function(chroms,starts,ends,y,chromWidth,pixel.per.cnv,cohorts
   indX <- chroms == 'X'
   indY <- chroms == 'Y'
   len <- length(starts)
-  color.value <- GetColor(method=method,color=color,cohorts=cohorts,q=TRUE)
+  
+  color.value <- GetColor(method=method,color=color,cohorts=cohorts)
+  cohort.list <- sort(unique(cohort))
+  
   startPoint <- chromWidth
   
   # Autosomes
   for(index in 1:len){
+    cohort.index <- match(cohort[index],cohort.list)
     x <- startPoint + pixel.per.cnv*index
-    lines(c(x,x),c(y-starts[index],y-ends[index]),col=cohorts[index],lwd=pixel.per.cnv)
+    #lines(c(x,x),c(y-starts[index],y-ends[index]),col=cohort[index],lwd=pixel.per.cnv)
+    lines(c(x,x),c(y-starts[index],y-ends[index]),
+          col=color.value[cohort.index],lwd=pixel.per.cnv)
   }
   
   # X Chromosome
